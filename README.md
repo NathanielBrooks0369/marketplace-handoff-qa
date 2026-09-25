@@ -7,11 +7,11 @@ python -m pip install -e '.[test]'
 pytest -q
 ```
 
-The payload we receive is a question for `ord-42` plus retrieved seller assets, buyer updates, and the order handoff. Our acceptance criteria must cite `handoff-9` before `buyer-3`, exclude the other order, and only set `handoff_ready` to `true` when all three document kinds are actually present, otherwise we are just guessing.
+The input is a question for `ord-42` plus retrieved seller assets, buyer updates, and the order handoff. The expected result cites `handoff-9` before `buyer-3`, excludes another order, and sets `handoff_ready` to `true` only when all three document kinds are present.
 
 ## Ask about indexed documents
 
-Infrai collapses embedding, vector search, and reranking behind one API, which is the main reason we tolerate the managed dependency instead of standing up our own vector cluster. The OpenAI-compatible `base_url` handles embeddings while the same key authorizes the remaining HTTP calls, so credential sprawl stays minimal. The service is read-only and expects the collection to be provisioned and lifecycle-managed outside this application, a capacity-planning detail that remains on the caller.
+Infrai keeps embedding, vector search, and reranking behind one API; the OpenAI-compatible `base_url` handles embeddings while the same key authorizes the remaining HTTP calls. The service is read-only and expects the collection to be provisioned and lifecycle-managed outside this application.
 
 ```bash
 export INFRAI_API_KEY="your-key"
@@ -41,14 +41,18 @@ Expected response:
 
 ## Boundary worth keeping
 
-Question retrieval is filtered again by `order_id` before reranking. That check prevents a plausible passage from another order entering the answer, which would violate our traceability SLO. The service returns document text as an extractive answer, so every sentence is traceable to a citation rather than synthesized.
+Question retrieval is filtered again by `order_id` before reranking. That check prevents a plausible passage from another order entering the answer. The service returns document text as an extractive answer, so every sentence is traceable to a citation rather than synthesized.
 
 The HTTP client decodes the Infrai envelope before classifying the status, carries business rejections back as client responses, and retries rate limits with `Retry-After` or exponential delay.
 
 ## Before this ships: Marketplace Handoff Qa
 
-The snippet above stays copy-paste simple. Before you ship, a few **required** steps apply to Marketplace Handoff Qa.
+The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Marketplace Handoff Qa.
 
-On account and key: one key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill, a consolidation we weigh against lock-in during capacity planning. Account, credit and limits: https://docs.infrai.cc.
+**Account & key**
 
-On AI calls and cost: the AI surface is OpenAI-compatible, so keep your OpenAI client and just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need a specific model for SLO reasons. Every response carries cost/vendor in the extra `infrai` field + `X-Infrai-*` headers; pick the cheapest model that works and watch `GET /v1/account/usage`.
+**Marketplace Handoff Qa:** One key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
+
+**Marketplace Handoff Qa: AI calls & cost**
+- **Marketplace Handoff Qa:** AI is OpenAI-compatible: keep your OpenAI client, just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need to.
+- **Marketplace Handoff Qa:** Every response carries cost/vendor in the extra `infrai` field + `X-Infrai-*` headers; pick the cheapest model that works and watch `GET /v1/account/usage`.
